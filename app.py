@@ -16,7 +16,7 @@ from pymongo import MongoClient, DESCENDING
 from pymongo.errors import ConnectionFailure
 
 # ─── CONFIG ──────────────────────────────────────────────────
-MONGO_URI     = os.getenv("MONGO_URI", "mongodb+srv://user:pass@cluster.mongodb.net/mineDB")
+MONGO_URI     = os.getenv("MONGO_URI", "mongodb+srv://son17july2006_db_user:m8KVGi6MLaQG7vwc@cluster0.ww44vj4.mongodb.net/?appName=Cluster0")
 DB_NAME       = "mineDB"
 COLLECTION    = "helmetData"
 PORT          = int(os.getenv("PORT", 5000))
