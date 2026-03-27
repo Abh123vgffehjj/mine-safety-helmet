@@ -16,7 +16,7 @@ from pymongo import MongoClient, DESCENDING
 from pymongo.errors import ConnectionFailure
 
 # ─── CONFIG ──────────────────────────────────────────────────
-MONGO_URI     = os.getenv("MONGO_URI", "mongodb+srv://son17july2006_db_user:m8KVGi6MLaQG7vwc@cluster0.ww44vj4.mongodb.net/?appName=Cluster0")
+MONGO_URI     = os.getenv("MONGO_URI", "mongodb+srv://user:pass@cluster.mongodb.net/mineDB")
 DB_NAME       = "mineDB"
 COLLECTION    = "helmetData"
 PORT          = int(os.getenv("PORT", 5000))
@@ -102,17 +102,24 @@ def compute_health_score(heart_rate: int, gas: int, temperature: float) -> int:
     return max(0, min(100, total))
 
 
-def classify_working_status(accel_x: float, heart_rate: int, health_score: int) -> str:
+def classify_working_status(accel_x: float, heart_rate: int, health_score: int,
+                            accel_y: float = 0.0, accel_z: float = 9.8) -> str:
     """
     Working Status using MPU6050 + heart rate:
       CRITICAL  → health_score < 40 OR extreme HR
-      WORKING   → movement detected + HR elevated
+      WORKING   → movement detected (deviation from gravity) + HR elevated
       IDLE      → low movement + normal/low HR
+
+    Uses full 3D deviation from gravity vector (9.8 m/s²) to measure
+    actual movement, not just the x-axis component.
     """
     if health_score < 40 or heart_rate > HR_CRITICAL or heart_rate < 40:
         return "CRITICAL"
 
-    movement = abs(accel_x)  # Simplified: use x-axis magnitude
+    # Deviation of the total acceleration magnitude from resting gravity.
+    # When still: magnitude ≈ 9.8. When moving: magnitude deviates.
+    magnitude = math.sqrt(accel_x**2 + accel_y**2 + accel_z**2)
+    movement = abs(magnitude - 9.8)
 
     if movement > 1.5 and heart_rate > 70:
         return "WORKING"
@@ -122,10 +129,14 @@ def classify_working_status(accel_x: float, heart_rate: int, health_score: int) 
         return "WORKING"
 
 
-def detect_fall(accel_x: float, accel_y: float = 0, accel_z: float = 9.8) -> bool:
+def detect_fall(accel_x: float, accel_y: float, accel_z: float) -> bool:
     """
     Fall detection: sudden large deviation from gravity vector.
-    If magnitude differs significantly from 9.8 m/s²
+    If total acceleration magnitude differs significantly from 9.8 m/s²
+    a fall / sudden impact is suspected.
+    accel_y and accel_z must be real sensor readings — never use 9.8 as
+    a default for accel_z because that would make the magnitude always
+    look like normal gravity even during a real fall.
     """
     magnitude = math.sqrt(accel_x**2 + accel_y**2 + accel_z**2)
     return magnitude > (9.8 + ACCEL_FALL) or magnitude < (9.8 - ACCEL_FALL)
@@ -139,12 +150,17 @@ def detect_anomalies(data: dict) -> list:
     alerts = []
 
     gas  = data.get("gas", 0)
-    hr   = data.get("heartRate", 72)
+    hr   = data.get("heartRate")   # None when sensor has no contact
     temp = data.get("temperature", 30)
     hs   = data.get("healthScore", 100)
     ax   = data.get("accel_x", 0)
     ay   = data.get("accel_y", 0)
-    az   = data.get("accel_z", 9.8)
+    az   = data.get("accel_z", 0)  # 0 = unknown; real sensor should send actual value
+
+    # Heart-rate sensor contact check
+    if hr is None or hr == 0:
+        alerts.append("🟡 WARNING: Heart rate sensor — no contact detected")
+        hr = 0  # treat as 0 for threshold checks below (won't falsely trigger HR alerts)
 
     if gas > GAS_DANGER:
         alerts.append(f"🔴 DANGER: Gas level critical ({gas})")
@@ -172,15 +188,15 @@ def detect_anomalies(data: dict) -> list:
 
 def analyze(record: dict) -> dict:
     """Run all AI logic and enrich record."""
-    hr   = record.get("heartRate", 72)
+    hr   = record.get("heartRate") or 0   # 0 = no contact; don't default to 72
     gas  = record.get("gas", 0)
     temp = record.get("temperature", 30)
     ax   = record.get("accel_x", 0)
     ay   = record.get("accel_y", 0)
-    az   = record.get("accel_z", 9.8)
+    az   = record.get("accel_z", 0)   # 0 = unknown; real sensor must send value
 
     hs     = compute_health_score(hr, gas, temp)
-    status = classify_working_status(ax, hr, hs)
+    status = classify_working_status(ax, hr, hs, ay, az)
     alerts = detect_anomalies({**record, "healthScore": hs})
     fall   = detect_fall(ax, ay, az)
 
