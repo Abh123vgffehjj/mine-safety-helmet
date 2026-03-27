@@ -4,1265 +4,560 @@
   <meta charset="UTF-8"/>
   <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
   <title>⛏ Mine Safety Control Room</title>
-  <link rel="preconnect" href="https://fonts.googleapis.com"/>
-  <link href="https://fonts.googleapis.com/css2?family=Share+Tech+Mono&family=Rajdhani:wght@400;500;600;700&family=Orbitron:wght@400;700;900&display=swap" rel="stylesheet"/>
+  <link href="https://fonts.googleapis.com/css2?family=Share+Tech+Mono&family=Rajdhani:wght@400;600;700&family=Orbitron:wght@700;900&display=swap" rel="stylesheet"/>
   <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
-
   <style>
-    /* ───────────────────────────────────────────────
-       ROOT & RESET
-    ─────────────────────────────────────────────── */
     :root {
-      --bg-deep:       #040a0f;
-      --bg-panel:      #07121d;
-      --bg-card:       #091825;
-      --bg-card-alt:   #0b1f30;
-      --border:        #0e3654;
-      --border-glow:   #1166aa;
-
-      --safe:          #00e676;
-      --safe-dim:      #00521e;
-      --warn:          #ffca28;
-      --warn-dim:      #5a3a00;
-      --danger:        #ff1744;
-      --danger-dim:    #4a0012;
-
-      --accent:        #00b8d4;
-      --accent2:       #7c4dff;
-      --text-bright:   #e8f4f8;
-      --text-mid:      #7aafca;
-      --text-dim:      #3a6880;
-
-      --font-mono:     'Share Tech Mono', monospace;
-      --font-ui:       'Rajdhani', sans-serif;
-      --font-display:  'Orbitron', sans-serif;
+      --bg:        #040a0f;
+      --panel:     #07121d;
+      --card:      #091825;
+      --border:    #0e3654;
+      --glow:      #1166aa;
+      --safe:      #00e676;
+      --warn:      #ffca28;
+      --danger:    #ff1744;
+      --offline:   #546e7a;
+      --accent:    #00b8d4;
+      --text:      #e8f4f8;
+      --mid:       #7aafca;
+      --dim:       #3a6880;
+      --mono:      'Share Tech Mono', monospace;
+      --ui:        'Rajdhani', sans-serif;
+      --disp:      'Orbitron', sans-serif;
     }
-
     *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    html, body { height: 100%; background: var(--bg); color: var(--text); font-family: var(--ui); overflow-x: hidden; }
+    body::after { content:''; position:fixed; inset:0; background:repeating-linear-gradient(to bottom,transparent 0,transparent 3px,rgba(0,0,0,.07) 3px,rgba(0,0,0,.07) 4px); pointer-events:none; z-index:9999; }
 
-    html, body {
-      height: 100%;
-      background: var(--bg-deep);
-      color: var(--text-bright);
-      font-family: var(--font-ui);
-      overflow-x: hidden;
-    }
+    /* ── HEADER ── */
+    header { display:flex; align-items:center; justify-content:space-between; padding:12px 24px; background:linear-gradient(90deg,#040d15,#071828,#040d15); border-bottom:1px solid var(--glow); position:sticky; top:0; z-index:100; }
+    .logo { display:flex; align-items:center; gap:12px; }
+    .logo-icon { font-size:26px; animation:pulse-icon 3s ease-in-out infinite; }
+    @keyframes pulse-icon { 0%,100%{filter:drop-shadow(0 0 6px var(--accent))} 50%{filter:drop-shadow(0 0 16px var(--accent))} }
+    .title { font-family:var(--disp); font-size:16px; color:var(--accent); letter-spacing:2px; text-shadow:0 0 12px rgba(0,184,212,.5); }
+    .subtitle { font-family:var(--mono); font-size:9px; color:var(--dim); letter-spacing:3px; margin-top:2px; }
+    .hright { display:flex; align-items:center; gap:16px; }
+    .conn-dot { width:9px; height:9px; border-radius:50%; background:var(--safe); box-shadow:0 0 8px var(--safe); animation:blink-dot 2s step-start infinite; }
+    @keyframes blink-dot { 50%{opacity:.3} }
+    .clock { font-family:var(--mono); font-size:14px; color:var(--mid); }
+    .btn { padding:6px 14px; background:transparent; border:1px solid var(--accent); color:var(--accent); font-family:var(--mono); font-size:10px; letter-spacing:1px; cursor:pointer; transition:all .2s; }
+    .btn:hover { background:var(--accent); color:var(--bg); }
+    .btn.danger-btn { border-color:var(--danger); color:var(--danger); }
+    .btn.danger-btn:hover { background:var(--danger); color:#fff; }
 
-    /* Scanline overlay */
-    body::after {
-      content: '';
-      position: fixed; inset: 0;
-      background: repeating-linear-gradient(
-        to bottom,
-        transparent 0px,
-        transparent 3px,
-        rgba(0,0,0,0.08) 3px,
-        rgba(0,0,0,0.08) 4px
-      );
-      pointer-events: none;
-      z-index: 9999;
-    }
+    /* ── STAT BAR ── */
+    .statbar { display:flex; border-bottom:1px solid var(--border); }
+    .stat { flex:1; padding:10px 18px; border-right:1px solid var(--border); display:flex; align-items:center; gap:10px; }
+    .stat:last-child { border-right:none; }
+    .stat-lbl { font-family:var(--mono); font-size:8px; color:var(--dim); letter-spacing:2px; }
+    .stat-val { font-family:var(--disp); font-size:20px; color:var(--accent); }
+    .stat-val.red   { color:var(--danger); text-shadow:0 0 8px var(--danger); }
+    .stat-val.yellow{ color:var(--warn); }
+    .stat-val.grey  { color:var(--offline); }
 
-    /* ───────────────────────────────────────────────
-       HEADER
-    ─────────────────────────────────────────────── */
-    header {
-      display: flex;
-      align-items: center;
-      justify-content: space-between;
-      padding: 12px 28px;
-      background: linear-gradient(90deg, #040d15 0%, #071828 50%, #040d15 100%);
-      border-bottom: 1px solid var(--border-glow);
-      box-shadow: 0 0 30px rgba(0,184,212,0.12);
-      position: sticky; top: 0; z-index: 100;
-    }
+    /* ── LAYOUT ── */
+    .main { display:grid; grid-template-columns:1fr 320px; height:calc(100vh - 104px); }
 
-    .header-left {
-      display: flex;
-      align-items: center;
-      gap: 14px;
-    }
-
-    .logo-icon {
-      font-size: 28px;
-      animation: pulse-icon 3s ease-in-out infinite;
-    }
-
-    @keyframes pulse-icon {
-      0%, 100% { filter: drop-shadow(0 0 6px var(--accent)); }
-      50%       { filter: drop-shadow(0 0 16px var(--accent)); }
-    }
-
-    .header-title {
-      font-family: var(--font-display);
-      font-size: 18px;
-      font-weight: 700;
-      color: var(--accent);
-      letter-spacing: 2px;
-      text-shadow: 0 0 12px rgba(0,184,212,0.5);
-      line-height: 1;
-    }
-
-    .header-sub {
-      font-family: var(--font-mono);
-      font-size: 10px;
-      color: var(--text-dim);
-      letter-spacing: 3px;
-      margin-top: 3px;
-    }
-
-    .header-right {
-      display: flex;
-      align-items: center;
-      gap: 20px;
-    }
-
-    .clock {
-      font-family: var(--font-mono);
-      font-size: 15px;
-      color: var(--text-mid);
-    }
-
-    .status-dot {
-      width: 10px; height: 10px;
-      border-radius: 50%;
-      background: var(--safe);
-      box-shadow: 0 0 8px var(--safe);
-      animation: blink-dot 2s step-start infinite;
-    }
-
-    @keyframes blink-dot {
-      50% { opacity: 0.3; }
-    }
-
-    .btn-sim {
-      padding: 6px 16px;
-      background: transparent;
-      border: 1px solid var(--accent);
-      color: var(--accent);
-      font-family: var(--font-mono);
-      font-size: 11px;
-      letter-spacing: 1px;
-      cursor: pointer;
-      transition: all 0.2s;
-    }
-    .btn-sim:hover {
-      background: var(--accent);
-      color: var(--bg-deep);
-    }
-
-    /* ───────────────────────────────────────────────
-       STAT BAR
-    ─────────────────────────────────────────────── */
-    .stat-bar {
-      display: flex;
-      gap: 0;
-      padding: 0;
-      border-bottom: 1px solid var(--border);
-    }
-
-    .stat-item {
-      flex: 1;
-      padding: 10px 20px;
-      border-right: 1px solid var(--border);
-      display: flex;
-      align-items: center;
-      gap: 10px;
-    }
-    .stat-item:last-child { border-right: none; }
-
-    .stat-icon { font-size: 18px; }
-
-    .stat-label {
-      font-family: var(--font-mono);
-      font-size: 9px;
-      color: var(--text-dim);
-      letter-spacing: 2px;
-      text-transform: uppercase;
-    }
-
-    .stat-val {
-      font-family: var(--font-display);
-      font-size: 20px;
-      font-weight: 700;
-      color: var(--accent);
-      line-height: 1;
-    }
-
-    .stat-val.danger { color: var(--danger); text-shadow: 0 0 8px var(--danger); }
-    .stat-val.warn   { color: var(--warn); }
-
-    /* ───────────────────────────────────────────────
-       MAIN LAYOUT
-    ─────────────────────────────────────────────── */
-    .main {
-      display: grid;
-      grid-template-columns: 1fr 340px;
-      grid-template-rows: auto 1fr;
-      gap: 0;
-      height: calc(100vh - 104px);
-    }
-
-    /* ───────────────────────────────────────────────
-       MINER GRID
-    ─────────────────────────────────────────────── */
-    .miners-section {
-      grid-column: 1;
-      grid-row: 1 / 3;
-      padding: 20px;
-      overflow-y: auto;
-    }
-
-    .section-header {
-      font-family: var(--font-mono);
-      font-size: 10px;
-      letter-spacing: 3px;
-      color: var(--text-dim);
-      text-transform: uppercase;
-      margin-bottom: 14px;
-      display: flex;
-      align-items: center;
-      gap: 8px;
-    }
-
-    .section-header::after {
-      content: '';
-      flex: 1;
-      height: 1px;
-      background: var(--border);
-    }
-
-    .miners-grid {
-      display: grid;
-      grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
-      gap: 14px;
-    }
+    /* ── MINER GRID ── */
+    .miners { padding:18px; overflow-y:auto; }
+    .sec-hdr { font-family:var(--mono); font-size:9px; letter-spacing:3px; color:var(--dim); margin-bottom:14px; display:flex; align-items:center; gap:8px; }
+    .sec-hdr::after { content:''; flex:1; height:1px; background:var(--border); }
+    .grid { display:grid; grid-template-columns:repeat(auto-fill,minmax(270px,1fr)); gap:12px; }
 
     /* ── MINER CARD ── */
-    .miner-card {
-      background: var(--bg-card);
-      border: 1px solid var(--border);
-      padding: 16px;
-      position: relative;
-      overflow: hidden;
-      transition: border-color 0.3s;
-      cursor: pointer;
-    }
-
-    .miner-card::before {
-      content: '';
-      position: absolute;
-      top: 0; left: 0;
-      width: 3px; height: 100%;
-      background: var(--safe);
-      transition: background 0.3s;
-    }
-
-    .miner-card.warn::before    { background: var(--warn); }
-    .miner-card.danger::before  { background: var(--danger); }
-    .miner-card.danger {
-      border-color: var(--danger);
-      animation: blink-card 1s step-start infinite;
-    }
-
+    .card { background:var(--card); border:1px solid var(--border); padding:14px; position:relative; overflow:hidden; transition:border-color .3s; }
+    .card::before { content:''; position:absolute; top:0; left:0; width:3px; height:100%; background:var(--safe); transition:background .3s; }
+    .card.warn::before   { background:var(--warn); }
+    .card.danger::before { background:var(--danger); }
+    .card.offline::before{ background:var(--offline); }
+    .card.danger { border-color:var(--danger); animation:blink-card 1s step-start infinite; }
     @keyframes blink-card {
-      0%   { box-shadow: 0 0 20px rgba(255,23,68,0.3); border-color: var(--danger); }
-      50%  { box-shadow: 0 0 2px rgba(255,23,68,0.1);  border-color: var(--bg-card); }
-      100% { box-shadow: 0 0 20px rgba(255,23,68,0.3); border-color: var(--danger); }
+      0%  { box-shadow:0 0 20px rgba(255,23,68,.35); border-color:var(--danger); }
+      50% { box-shadow:none; border-color:var(--card); }
+      100%{ box-shadow:0 0 20px rgba(255,23,68,.35); border-color:var(--danger); }
     }
+    .card.offline { border-color:var(--offline); opacity:.6; animation:none; }
 
-    /* corner decoration */
-    .miner-card::after {
-      content: '';
-      position: absolute;
-      top: 0; right: 0;
-      border-top: 20px solid var(--border);
-      border-left: 20px solid transparent;
-      transition: border-top-color 0.3s;
-    }
-    .miner-card.danger::after { border-top-color: var(--danger); }
+    .card-top { display:flex; align-items:center; justify-content:space-between; margin-bottom:12px; }
+    .miner-id { font-family:var(--disp); font-size:12px; color:var(--accent); letter-spacing:2px; }
+    .badge { padding:3px 9px; font-family:var(--mono); font-size:8px; letter-spacing:2px; }
+    .badge.WORKING  { background:rgba(0,230,118,.12); color:var(--safe); border:1px solid var(--safe); }
+    .badge.IDLE     { background:rgba(255,202,40,.12); color:var(--warn); border:1px solid var(--warn); }
+    .badge.CRITICAL { background:rgba(255,23,68,.18); color:var(--danger); border:1px solid var(--danger); animation:flash .5s alternate infinite; }
+    .badge.OFFLINE  { background:rgba(84,110,122,.15); color:var(--offline); border:1px solid var(--offline); }
+    @keyframes flash { from{opacity:1} to{opacity:.35} }
 
-    .card-header {
-      display: flex;
-      align-items: center;
-      justify-content: space-between;
-      margin-bottom: 14px;
-    }
+    .metrics { display:grid; grid-template-columns:1fr 1fr; gap:7px; margin-bottom:10px; }
+    .metric { background:rgba(0,0,0,.3); padding:7px 9px; border:1px solid rgba(14,54,84,.5); }
+    .mlbl { font-family:var(--mono); font-size:7px; color:var(--dim); letter-spacing:2px; }
+    .mval { font-family:var(--mono); font-size:17px; font-weight:bold; color:var(--text); line-height:1.2; }
+    .mval.safe   { color:var(--safe); }
+    .mval.warn   { color:var(--warn); }
+    .mval.danger { color:var(--danger); text-shadow:0 0 6px var(--danger); }
+    .mval.grey   { color:var(--offline); font-size:12px; margin-top:3px; }
+    .munit { font-size:8px; color:var(--dim); margin-left:2px; }
 
-    .miner-id {
-      font-family: var(--font-display);
-      font-size: 13px;
-      font-weight: 700;
-      color: var(--accent);
-      letter-spacing: 2px;
-    }
+    /* health bar */
+    .hbar-wrap { margin-bottom:10px; }
+    .hbar-hdr  { display:flex; justify-content:space-between; font-family:var(--mono); font-size:8px; color:var(--dim); margin-bottom:4px; }
+    .hbar-track{ height:5px; background:rgba(0,0,0,.4); border:1px solid var(--border); overflow:hidden; }
+    .hbar-fill { height:100%; transition:width .8s ease,background .5s; }
 
-    .status-badge {
-      padding: 3px 10px;
-      font-family: var(--font-mono);
-      font-size: 9px;
-      letter-spacing: 2px;
-      font-weight: bold;
-    }
+    /* alert tags + dismiss */
+    .alert-row { display:flex; align-items:flex-start; flex-wrap:wrap; gap:4px; margin-bottom:8px; min-height:4px; }
+    .atag { font-family:var(--mono); font-size:7px; color:var(--danger); padding:2px 5px; border:1px solid rgba(255,23,68,.4); background:rgba(255,23,68,.08); }
+    .atag.warn-tag { color:var(--warn); border-color:rgba(255,202,40,.4); background:rgba(255,202,40,.06); }
 
-    .status-badge.WORKING  { background: rgba(0,230,118,0.15); color: var(--safe); border: 1px solid var(--safe); }
-    .status-badge.IDLE     { background: rgba(255,202,40,0.15); color: var(--warn); border: 1px solid var(--warn); }
-    .status-badge.CRITICAL { background: rgba(255,23,68,0.2);  color: var(--danger); border: 1px solid var(--danger); animation: flash-text 0.5s alternate infinite; }
+    /* DISMISS BUTTON */
+    .dismiss-btn { margin-top:6px; width:100%; padding:5px; background:rgba(255,23,68,.1); border:1px solid var(--danger); color:var(--danger); font-family:var(--mono); font-size:9px; letter-spacing:1px; cursor:pointer; transition:all .2s; }
+    .dismiss-btn:hover { background:var(--danger); color:#fff; }
+    .acked-badge { font-family:var(--mono); font-size:8px; color:var(--safe); letter-spacing:1px; padding:4px 8px; border:1px solid rgba(0,230,118,.3); background:rgba(0,230,118,.06); text-align:center; margin-top:6px; }
 
-    @keyframes flash-text {
-      from { opacity: 1; }
-      to   { opacity: 0.4; }
-    }
+    /* offline overlay text */
+    .offline-msg { font-family:var(--mono); font-size:10px; color:var(--offline); text-align:center; padding:8px 0; letter-spacing:2px; }
 
-    .card-metrics {
-      display: grid;
-      grid-template-columns: 1fr 1fr;
-      gap: 8px;
-      margin-bottom: 12px;
-    }
+    .ts { font-family:var(--mono); font-size:7px; color:var(--dim); text-align:right; margin-top:6px; }
 
-    .metric {
-      background: rgba(0,0,0,0.3);
-      padding: 8px 10px;
-      border: 1px solid rgba(14,54,84,0.5);
-    }
+    /* ── SIDEBAR ── */
+    .sidebar { border-left:1px solid var(--border); overflow-y:auto; display:flex; flex-direction:column; }
+    .chartpanel { padding:16px; border-bottom:1px solid var(--border); }
+    .chtitle { font-family:var(--mono); font-size:8px; letter-spacing:3px; color:var(--dim); margin-bottom:10px; }
+    .chbox { height:150px; position:relative; }
 
-    .metric-label {
-      font-family: var(--font-mono);
-      font-size: 8px;
-      color: var(--text-dim);
-      letter-spacing: 2px;
-      text-transform: uppercase;
-    }
+    .logpanel { flex:1; padding:16px; overflow-y:auto; }
+    .logtitle { font-family:var(--mono); font-size:8px; letter-spacing:3px; color:var(--dim); margin-bottom:10px; }
+    .logentry { font-family:var(--mono); font-size:9px; color:var(--mid); padding:5px 7px; border-left:2px solid var(--border); margin-bottom:3px; animation:slide-in .3s ease; }
+    .logentry.danger { border-left-color:var(--danger); color:#ff8a80; }
+    .logentry.warn   { border-left-color:var(--warn);   color:#ffe082; }
+    .logentry.info   { border-left-color:var(--accent); }
+    .logentry.ack    { border-left-color:var(--safe);   color:var(--safe); }
+    @keyframes slide-in { from{transform:translateX(20px);opacity:0} to{transform:translateX(0);opacity:1} }
+    .ltime { color:var(--dim); font-size:7px; display:block; margin-top:1px; }
 
-    .metric-value {
-      font-family: var(--font-mono);
-      font-size: 18px;
-      font-weight: bold;
-      color: var(--text-bright);
-      line-height: 1.2;
-    }
+    /* no data */
+    .nodata { display:flex; flex-direction:column; align-items:center; justify-content:center; gap:14px; padding:60px 30px; text-align:center; color:var(--dim); }
+    .nodata-icon { font-size:44px; opacity:.4; }
+    .nodata h3 { font-family:var(--disp); font-size:13px; letter-spacing:2px; color:var(--mid); }
+    .nodata p  { font-family:var(--mono); font-size:9px; line-height:1.8; }
 
-    .metric-value.safe   { color: var(--safe); }
-    .metric-value.warn   { color: var(--warn); }
-    .metric-value.danger { color: var(--danger); text-shadow: 0 0 6px var(--danger); }
+    ::-webkit-scrollbar { width:4px; }
+    ::-webkit-scrollbar-track { background:var(--bg); }
+    ::-webkit-scrollbar-thumb { background:var(--glow); }
 
-    .metric-unit {
-      font-size: 9px;
-      color: var(--text-dim);
-      margin-left: 2px;
-    }
-
-    /* Health Score bar */
-    .health-bar-wrap {
-      margin-top: 10px;
-    }
-
-    .health-bar-header {
-      display: flex;
-      justify-content: space-between;
-      font-family: var(--font-mono);
-      font-size: 9px;
-      color: var(--text-dim);
-      letter-spacing: 1px;
-      margin-bottom: 5px;
-    }
-
-    .health-score-val {
-      font-size: 11px;
-      font-weight: bold;
-    }
-
-    .health-bar-track {
-      height: 6px;
-      background: rgba(0,0,0,0.4);
-      border: 1px solid var(--border);
-      overflow: hidden;
-      position: relative;
-    }
-
-    .health-bar-fill {
-      height: 100%;
-      transition: width 0.8s ease, background 0.5s;
-      position: relative;
-    }
-
-    .health-bar-fill::after {
-      content: '';
-      position: absolute;
-      right: 0; top: 0; bottom: 0;
-      width: 4px;
-      background: white;
-      opacity: 0.6;
-    }
-
-    .alerts-row {
-      margin-top: 10px;
-      min-height: 20px;
-    }
-
-    .alert-tag {
-      display: inline-block;
-      font-family: var(--font-mono);
-      font-size: 8px;
-      color: var(--danger);
-      letter-spacing: 1px;
-      padding: 2px 6px;
-      border: 1px solid rgba(255,23,68,0.4);
-      background: rgba(255,23,68,0.08);
-      margin: 2px 2px 0 0;
-    }
-
-    .timestamp {
-      margin-top: 8px;
-      font-family: var(--font-mono);
-      font-size: 8px;
-      color: var(--text-dim);
-      text-align: right;
-    }
-
-    /* ───────────────────────────────────────────────
-       SIDEBAR - CHARTS
-    ─────────────────────────────────────────────── */
-    .sidebar {
-      grid-column: 2;
-      grid-row: 1 / 3;
-      border-left: 1px solid var(--border);
-      overflow-y: auto;
-      display: flex;
-      flex-direction: column;
-    }
-
-    .chart-panel {
-      padding: 18px;
-      border-bottom: 1px solid var(--border);
-    }
-
-    .chart-title {
-      font-family: var(--font-mono);
-      font-size: 9px;
-      letter-spacing: 3px;
-      color: var(--text-dim);
-      text-transform: uppercase;
-      margin-bottom: 12px;
-    }
-
-    .chart-container {
-      height: 160px;
-      position: relative;
-    }
-
-    /* Alert Log */
-    .alert-log {
-      flex: 1;
-      padding: 18px;
-      overflow-y: auto;
-    }
-
-    .alert-log-title {
-      font-family: var(--font-mono);
-      font-size: 9px;
-      letter-spacing: 3px;
-      color: var(--text-dim);
-      margin-bottom: 12px;
-    }
-
-    .log-entry {
-      font-family: var(--font-mono);
-      font-size: 10px;
-      color: var(--text-mid);
-      padding: 6px 8px;
-      border-left: 2px solid var(--border);
-      margin-bottom: 4px;
-      line-height: 1.4;
-      animation: slide-in 0.3s ease;
-    }
-
-    .log-entry.danger { border-left-color: var(--danger); color: #ff8a80; }
-    .log-entry.warn   { border-left-color: var(--warn); color: #ffe082; }
-    .log-entry.info   { border-left-color: var(--accent); }
-
-    @keyframes slide-in {
-      from { transform: translateX(20px); opacity: 0; }
-      to   { transform: translateX(0); opacity: 1; }
-    }
-
-    .log-time {
-      color: var(--text-dim);
-      font-size: 8px;
-      display: block;
-      margin-top: 2px;
-    }
-
-    /* ───────────────────────────────────────────────
-       PLACEHOLDER
-    ─────────────────────────────────────────────── */
-    .no-data {
-      display: flex;
-      flex-direction: column;
-      align-items: center;
-      justify-content: center;
-      gap: 16px;
-      padding: 60px 40px;
-      text-align: center;
-      color: var(--text-dim);
-    }
-
-    .no-data-icon { font-size: 48px; opacity: 0.4; }
-
-    .no-data h3 {
-      font-family: var(--font-display);
-      font-size: 14px;
-      letter-spacing: 2px;
-      color: var(--text-mid);
-    }
-
-    .no-data p {
-      font-family: var(--font-mono);
-      font-size: 10px;
-      line-height: 1.8;
-      max-width: 280px;
-    }
-
-    /* ───────────────────────────────────────────────
-       SCROLLBAR
-    ─────────────────────────────────────────────── */
-    ::-webkit-scrollbar { width: 4px; }
-    ::-webkit-scrollbar-track { background: var(--bg-deep); }
-    ::-webkit-scrollbar-thumb { background: var(--border-glow); }
-
-    /* ───────────────────────────────────────────────
-       ALERT BANNER (dismissible, top of screen)
-    ─────────────────────────────────────────────── */
-    #alertBanner {
-      display: none;
-      position: fixed;
-      top: 0; left: 0; right: 0;
-      z-index: 1000;
-      background: linear-gradient(90deg, #3a0010, #7a001a, #3a0010);
-      border-bottom: 2px solid var(--danger);
-      padding: 10px 20px;
-      display: none;
-      align-items: center;
-      gap: 14px;
-      animation: banner-flash 0.8s step-start infinite;
-    }
-
-    @keyframes banner-flash {
-      0%, 100% { border-bottom-color: var(--danger); }
-      50%       { border-bottom-color: transparent; }
-    }
-
-    #alertBanner .banner-icon { font-size: 22px; }
-
-    #alertBanner .banner-text {
-      flex: 1;
-      font-family: var(--font-mono);
-      font-size: 11px;
-      color: #ff8a80;
-      letter-spacing: 1px;
-    }
-
-    #alertBanner .banner-sound-toggle {
-      font-family: var(--font-mono);
-      font-size: 10px;
-      padding: 4px 10px;
-      background: transparent;
-      border: 1px solid rgba(255,23,68,0.5);
-      color: #ff8a80;
-      cursor: pointer;
-      letter-spacing: 1px;
-    }
-    #alertBanner .banner-sound-toggle:hover { background: rgba(255,23,68,0.15); }
-
-    #alertBanner .banner-dismiss {
-      font-family: var(--font-mono);
-      font-size: 10px;
-      padding: 4px 14px;
-      background: var(--danger);
-      border: none;
-      color: white;
-      cursor: pointer;
-      letter-spacing: 2px;
-      font-weight: bold;
-    }
-    #alertBanner .banner-dismiss:hover { background: #d50032; }
-
-    /* ───────────────────────────────────────────────
-       DISCONNECTED OVERLAY on miner card
-    ─────────────────────────────────────────────── */
-    .miner-card.disconnected {
-      opacity: 0.55;
-      border-color: var(--text-dim) !important;
-      animation: none !important;
-    }
-    .miner-card.disconnected::before { background: var(--text-dim) !important; }
-
-    .disconnected-badge {
-      display: inline-block;
-      font-family: var(--font-mono);
-      font-size: 9px;
-      color: var(--text-dim);
-      border: 1px solid var(--text-dim);
-      padding: 2px 8px;
-      letter-spacing: 2px;
-      margin-bottom: 8px;
-    }
-
-    .disconnected-overlay {
-      position: absolute;
-      inset: 0;
-      background: rgba(4, 10, 15, 0.7);
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      font-family: var(--font-mono);
-      font-size: 11px;
-      letter-spacing: 3px;
-      color: var(--text-dim);
-      flex-direction: column;
-      gap: 6px;
-    }
-    .disconnected-overlay .disc-icon { font-size: 28px; opacity: 0.5; }
-
-    /* ───────────────────────────────────────────────
-       RESPONSIVE
-    ─────────────────────────────────────────────── */
-    @media (max-width: 900px) {
-      .main {
-        grid-template-columns: 1fr;
-        height: auto;
-      }
-      .sidebar {
-        grid-column: 1;
-        border-left: none;
-        border-top: 1px solid var(--border);
-      }
+    @media(max-width:860px){
+      .main { grid-template-columns:1fr; height:auto; }
+      .sidebar { border-left:none; border-top:1px solid var(--border); }
     }
   </style>
 </head>
-
 <body>
 
-<!-- ═══ ALERT BANNER (dismissible) ══════════════════════════ -->
-<div id="alertBanner">
-  <span class="banner-icon">🚨</span>
-  <div class="banner-text" id="bannerText">CRITICAL ALERT — SEE MINER CARDS BELOW</div>
-  <button class="banner-sound-toggle" id="soundToggleBtn" onclick="toggleSound()">🔇 MUTE</button>
-  <button class="banner-dismiss" onclick="dismissAlert()">✓ DISMISS</button>
-</div>
-
-<!-- ═══ HEADER ═══════════════════════════════════════════════ -->
 <header>
-  <div class="header-left">
+  <div class="logo">
     <span class="logo-icon">⛏</span>
     <div>
-      <div class="header-title">MINE SAFETY CONTROL</div>
-      <div class="header-sub">REAL-TIME MONITORING SYSTEM v2.0</div>
+      <div class="title">MINE SAFETY CONTROL</div>
+      <div class="subtitle">REAL-TIME MONITORING SYSTEM v3.0</div>
     </div>
   </div>
-  <div class="header-right">
-    <div class="status-dot" id="connDot"></div>
+  <div class="hright">
+    <div class="conn-dot" id="connDot"></div>
     <div class="clock" id="clock">--:--:--</div>
-    <button class="btn-sim" onclick="triggerSimulate()">⚡ SIMULATE DATA</button>
+    <button class="btn danger-btn" id="muteBtn" onclick="toggleMute()">🔔 SOUND ON</button>
+    <button class="btn" onclick="triggerSim()">⚡ SIMULATE</button>
   </div>
 </header>
 
-<!-- ═══ STAT BAR ═════════════════════════════════════════════ -->
-<div class="stat-bar">
-  <div class="stat-item">
-    <span class="stat-icon">👷</span>
-    <div>
-      <div class="stat-label">Active Miners</div>
-      <div class="stat-val" id="statMiners">0</div>
-    </div>
-  </div>
-  <div class="stat-item">
-    <span class="stat-icon">✅</span>
-    <div>
-      <div class="stat-label">Safe</div>
-      <div class="stat-val" id="statSafe">0</div>
-    </div>
-  </div>
-  <div class="stat-item">
-    <span class="stat-icon">⚠️</span>
-    <div>
-      <div class="stat-label">Warning</div>
-      <div class="stat-val" id="statWarn">0</div>
-    </div>
-  </div>
-  <div class="stat-item">
-    <span class="stat-icon">🚨</span>
-    <div>
-      <div class="stat-label">Critical</div>
-      <div class="stat-val danger" id="statDanger">0</div>
-    </div>
-  </div>
-  <div class="stat-item">
-    <span class="stat-icon">🔄</span>
-    <div>
-      <div class="stat-label">Last Update</div>
-      <div class="stat-val" id="statUpdate" style="font-size:13px">--:--</div>
-    </div>
-  </div>
+<div class="statbar">
+  <div class="stat"><span>👷</span><div><div class="stat-lbl">ACTIVE</div><div class="stat-val" id="sTotal">0</div></div></div>
+  <div class="stat"><span>✅</span><div><div class="stat-lbl">SAFE</div><div class="stat-val" id="sSafe">0</div></div></div>
+  <div class="stat"><span>⚠️</span><div><div class="stat-lbl">WARNING</div><div class="stat-val yellow" id="sWarn">0</div></div></div>
+  <div class="stat"><span>🚨</span><div><div class="stat-lbl">CRITICAL</div><div class="stat-val red" id="sDanger">0</div></div></div>
+  <div class="stat"><span>📡</span><div><div class="stat-lbl">OFFLINE</div><div class="stat-val grey" id="sOffline">0</div></div></div>
+  <div class="stat"><span>🔄</span><div><div class="stat-lbl">UPDATED</div><div class="stat-val" id="sTime" style="font-size:13px">--</div></div></div>
 </div>
 
-<!-- ═══ MAIN ══════════════════════════════════════════════════ -->
 <div class="main">
-
-  <!-- Miners Grid -->
-  <div class="miners-section">
-    <div class="section-header">⬡ MINER STATUS</div>
-    <div class="miners-grid" id="minersGrid">
-      <div class="no-data">
-        <div class="no-data-icon">📡</div>
+  <div class="miners">
+    <div class="sec-hdr">⬡ MINER STATUS</div>
+    <div class="grid" id="grid">
+      <div class="nodata">
+        <div class="nodata-icon">📡</div>
         <h3>AWAITING SIGNAL</h3>
-        <p>No helmet data received yet.<br/>
-           Ensure ESP32 helmets are powered and connected,<br/>
-           or click <strong>SIMULATE DATA</strong> to test.</p>
+        <p>No helmet data received.<br/>Click <strong>⚡ SIMULATE</strong> to test.</p>
       </div>
     </div>
   </div>
 
-  <!-- Sidebar -->
   <div class="sidebar">
-    <!-- Gas Chart -->
-    <div class="chart-panel">
-      <div class="chart-title">▶ GAS LEVELS (PPM)</div>
-      <div class="chart-container">
-        <canvas id="gasChart"></canvas>
-      </div>
+    <div class="chartpanel">
+      <div class="chtitle">▶ GAS LEVELS (ppm)</div>
+      <div class="chbox"><canvas id="gasChart"></canvas></div>
     </div>
-
-    <!-- Heart Rate Chart -->
-    <div class="chart-panel">
-      <div class="chart-title">▶ HEART RATE (BPM)</div>
-      <div class="chart-container">
-        <canvas id="hrChart"></canvas>
-      </div>
+    <div class="chartpanel">
+      <div class="chtitle">▶ HEART RATE (BPM)</div>
+      <div class="chbox"><canvas id="hrChart"></canvas></div>
     </div>
-
-    <!-- Alert Log -->
-    <div class="alert-log">
-      <div class="alert-log-title">▶ ALERT LOG</div>
-      <div id="alertLog">
-        <div class="log-entry info">
-          System initialized. Monitoring active.
-          <span class="log-time" id="initTime"></span>
-        </div>
+    <div class="logpanel">
+      <div class="logtitle">▶ ALERT LOG</div>
+      <div id="logBox">
+        <div class="logentry info">System initialized<span class="ltime" id="initT"></span></div>
       </div>
     </div>
   </div>
-
 </div>
-
-<!-- Alert sound (generated via Web Audio API) -->
-<audio id="alertAudio" preload="auto"></audio>
 
 <script>
-// ================================================================
-//  CONFIGURATION
-// ================================================================
-const API_BASE    = window.location.origin;  // Same origin as server
-const REFRESH_MS  = 3000;  // Poll every 3 seconds
-const MAX_HISTORY = 20;    // Chart data points
+// ── CONFIG ──
+const API       = window.location.origin;
+const REFRESH   = 3000;
+const MAX_PTS   = 20;
 
-// A miner is considered DISCONNECTED if no update received within this window.
-// Set to 3× the send interval (15 s) to tolerate one missed packet.
-const DISCONNECT_MS = 15000;
-
-// ================================================================
-//  STATE
-// ================================================================
-let miners        = {};       // {minerID: latestRecord}
-let minerLastSeen = {};       // {minerID: Date.now() timestamp}
-let gasHistory    = {};       // {minerID: [values]}
-let hrHistory     = {};       // {minerID: [values]}
-let alertActive   = false;    // Is there an unacknowledged alert?
-let soundMuted    = false;    // User has muted alert sound
-let alertInterval = null;     // Repeating beep interval handle
-let gasChart, hrChart;
+// ── STATE ──
+let miners      = {};
+let gasHist     = {};
+let hrHist      = {};
+let muted       = false;
 let audioCtx;
+let alarmActive = false;
+let alarmTimer  = null;
 
-// ================================================================
-//  CLOCK
-// ================================================================
-function updateClock() {
-  const now = new Date();
+document.getElementById("initT").textContent = new Date().toLocaleTimeString();
+
+// ── CLOCK ──
+setInterval(() => {
   document.getElementById("clock").textContent =
-    now.toLocaleTimeString("en-US", {hour12: false});
-}
-setInterval(updateClock, 1000);
-updateClock();
+    new Date().toLocaleTimeString("en-US",{hour12:false});
+}, 1000);
 
-document.getElementById("initTime").textContent =
-  new Date().toLocaleTimeString();
-
-// ================================================================
-//  WEB AUDIO ALERT
-// ================================================================
-function beepOnce() {
-  if (soundMuted) return;
-  try {
-    if (!audioCtx) audioCtx = new (window.AudioContext || window.webkitAudioContext)();
-
-    function beep(freq, start, dur) {
-      const osc  = audioCtx.createOscillator();
-      const gain = audioCtx.createGain();
-      osc.connect(gain);
-      gain.connect(audioCtx.destination);
-      osc.type = "square";
-      osc.frequency.value = freq;
-      gain.gain.setValueAtTime(0.15, audioCtx.currentTime + start);
-      gain.gain.exponentialRampToValueAtTime(0.001, audioCtx.currentTime + start + dur);
-      osc.start(audioCtx.currentTime + start);
-      osc.stop(audioCtx.currentTime + start + dur);
-    }
-
-    beep(880, 0,    0.1);
-    beep(660, 0.15, 0.1);
-    beep(880, 0.3,  0.1);
-    beep(440, 0.45, 0.15);
-  } catch(e) { /* autoplay blocked */ }
+// ── MUTE ──
+function toggleMute() {
+  muted = !muted;
+  document.getElementById("muteBtn").textContent = muted ? "🔕 SOUND OFF" : "🔔 SOUND ON";
+  if (muted) stopAlarm();
 }
 
-function startAlertSound() {
-  if (alertInterval) return;           // Already running
-  beepOnce();
-  alertInterval = setInterval(beepOnce, 4000);  // Repeat every 4 s
+// ── ALARM SOUND (loud, repeating) ──
+function initAudio() {
+  if (!audioCtx) audioCtx = new (window.AudioContext || window.webkitAudioContext)();
 }
 
-function stopAlertSound() {
-  if (alertInterval) { clearInterval(alertInterval); alertInterval = null; }
+function playBeep(freq, start, dur, vol=0.3) {
+  const osc  = audioCtx.createOscillator();
+  const gain = audioCtx.createGain();
+  const dist = audioCtx.createWaveShaper();  // slight distortion for harshness
+
+  function makeDistCurve(amount) {
+    const n=256, curve=new Float32Array(n);
+    for (let i=0;i<n;i++){const x=i*2/n-1; curve[i]=(Math.PI+amount)*x/(Math.PI+amount*Math.abs(x));}
+    return curve;
+  }
+  dist.curve = makeDistCurve(80);
+
+  osc.connect(dist); dist.connect(gain); gain.connect(audioCtx.destination);
+  osc.type = "sawtooth";
+  osc.frequency.value = freq;
+  gain.gain.setValueAtTime(0, audioCtx.currentTime + start);
+  gain.gain.linearRampToValueAtTime(vol, audioCtx.currentTime + start + 0.02);
+  gain.gain.setValueAtTime(vol, audioCtx.currentTime + start + dur - 0.05);
+  gain.gain.linearRampToValueAtTime(0, audioCtx.currentTime + start + dur);
+  osc.start(audioCtx.currentTime + start);
+  osc.stop(audioCtx.currentTime + start + dur);
 }
 
-// ================================================================
-//  ALERT BANNER — show / dismiss / mute
-// ================================================================
-function showAlertBanner(messages) {
-  const banner = document.getElementById("alertBanner");
-  document.getElementById("bannerText").textContent =
-    messages.length === 1
-      ? messages[0]
-      : `${messages.length} ACTIVE ALERTS — CHECK MINER CARDS`;
-  banner.style.display = "flex";
-  alertActive = true;
-  startAlertSound();
-  updateSoundBtn();
+function playSingleAlarm() {
+  initAudio();
+  // 3-tone siren: high-low-high
+  playBeep(1200, 0.00, 0.18, 0.35);
+  playBeep(800,  0.20, 0.18, 0.35);
+  playBeep(1200, 0.40, 0.18, 0.35);
+  playBeep(800,  0.60, 0.18, 0.35);
+  playBeep(1400, 0.80, 0.25, 0.4);
 }
 
-function dismissAlert() {
-  document.getElementById("alertBanner").style.display = "none";
-  alertActive = false;
-  stopAlertSound();
+function startAlarm() {
+  if (alarmActive || muted) return;
+  alarmActive = true;
+  playSingleAlarm();
+  // Repeat every 4 seconds while danger exists
+  alarmTimer = setInterval(() => {
+    if (!muted) playSingleAlarm();
+  }, 4000);
 }
 
-function toggleSound() {
-  soundMuted = !soundMuted;
-  if (soundMuted) stopAlertSound();
-  else if (alertActive) startAlertSound();
-  updateSoundBtn();
+function stopAlarm() {
+  alarmActive = false;
+  if (alarmTimer) { clearInterval(alarmTimer); alarmTimer = null; }
 }
 
-function updateSoundBtn() {
-  const btn = document.getElementById("soundToggleBtn");
-  btn.textContent = soundMuted ? "🔊 UNMUTE" : "🔇 MUTE";
+// ── HELPERS ──
+function gasClass(v)  { return v>=600?"danger":v>=300?"warn":"safe"; }
+function hrClass(v,on){ if(!on) return "grey"; return v>140||v<40?"danger":v>120||v<50?"warn":"safe"; }
+function tmpClass(v)  { return v>40?"danger":v>35?"warn":"safe"; }
+function healthColor(s){ return s>=70?"#00e676":s>=40?"#ffca28":"#ff1744"; }
+function fmt(ts)      { try{return new Date(ts).toLocaleTimeString("en-US",{hour12:false})}catch{return "--"} }
+
+// ── LOG ──
+function addLog(text, level="info") {
+  const box = document.getElementById("logBox");
+  const e   = document.createElement("div");
+  e.className = `logentry ${level}`;
+  e.innerHTML = `${text}<span class="ltime">${new Date().toLocaleTimeString()}</span>`;
+  box.prepend(e);
+  while (box.children.length > 60) box.removeChild(box.lastChild);
 }
 
-// ================================================================
-//  CHARTS
-// ================================================================
-const chartDefaults = {
-  type: "line",
-  options: {
-    responsive: true,
-    maintainAspectRatio: false,
-    animation: { duration: 400 },
-    plugins: { legend: { display: false } },
-    scales: {
-      x: {
-        ticks: { color: "#3a6880", font: { family: "Share Tech Mono", size: 8 } },
-        grid:  { color: "rgba(14,54,84,0.4)" }
-      },
-      y: {
-        ticks: { color: "#3a6880", font: { family: "Share Tech Mono", size: 8 } },
-        grid:  { color: "rgba(14,54,84,0.4)" }
-      }
-    }
+// ── CHARTS ──
+const chartOpts = {
+  responsive:true, maintainAspectRatio:false,
+  animation:{duration:300},
+  plugins:{legend:{display:false}},
+  scales:{
+    x:{ticks:{color:"#3a6880",font:{family:"Share Tech Mono",size:7}},grid:{color:"rgba(14,54,84,.4)"}},
+    y:{ticks:{color:"#3a6880",font:{family:"Share Tech Mono",size:7}},grid:{color:"rgba(14,54,84,.4)"}}
   }
 };
 
-function initCharts() {
-  const gasCtx = document.getElementById("gasChart").getContext("2d");
-  gasChart = new Chart(gasCtx, {
-    ...chartDefaults,
-    data: {
-      labels: [],
-      datasets: [{
-        data: [],
-        borderColor: "#ff6d00",
-        backgroundColor: "rgba(255,109,0,0.08)",
-        borderWidth: 1.5,
-        pointRadius: 2,
-        tension: 0.4,
-        fill: true
-      }]
-    },
-    options: {
-      ...chartDefaults.options,
-      scales: {
-        ...chartDefaults.options.scales,
-        y: { ...chartDefaults.options.scales.y, suggestedMin: 0, suggestedMax: 1000 }
-      }
-    }
-  });
-
-  const hrCtx = document.getElementById("hrChart").getContext("2d");
-  hrChart = new Chart(hrCtx, {
-    ...chartDefaults,
-    data: {
-      labels: [],
-      datasets: [{
-        data: [],
-        borderColor: "#f50057",
-        backgroundColor: "rgba(245,0,87,0.08)",
-        borderWidth: 1.5,
-        pointRadius: 2,
-        tension: 0.4,
-        fill: true
-      }]
-    },
-    options: {
-      ...chartDefaults.options,
-      scales: {
-        ...chartDefaults.options.scales,
-        y: { ...chartDefaults.options.scales.y, suggestedMin: 40, suggestedMax: 160 }
-      }
-    }
-  });
-}
+const gasChart = new Chart(document.getElementById("gasChart").getContext("2d"), {
+  type:"line", options:{...chartOpts, scales:{...chartOpts.scales, y:{...chartOpts.scales.y, suggestedMin:0, suggestedMax:1000}}},
+  data:{labels:[],datasets:[{data:[],borderColor:"#ff6d00",backgroundColor:"rgba(255,109,0,.07)",borderWidth:1.5,pointRadius:2,tension:.4,fill:true}]}
+});
+const hrChart = new Chart(document.getElementById("hrChart").getContext("2d"), {
+  type:"line", options:{...chartOpts, scales:{...chartOpts.scales, y:{...chartOpts.scales.y, suggestedMin:40, suggestedMax:160}}},
+  data:{labels:[],datasets:[{data:[],borderColor:"#f50057",backgroundColor:"rgba(245,0,87,.07)",borderWidth:1.5,pointRadius:2,tension:.4,fill:true}]}
+});
 
 function updateCharts() {
-  const minerIds = Object.keys(miners);
-  if (!minerIds.length) return;
-
-  const times   = [];
-  const gasVals = [];
-  const hrVals  = [];
-  const now     = new Date();
-
-  for (let i = 0; i < MAX_HISTORY; i++) {
-    let totalGas = 0, totalHR = 0, count = 0;
-    minerIds.forEach(id => {
-      const g = (gasHistory[id] || [])[i];
-      const h = (hrHistory[id]  || [])[i];
-      if (g !== undefined) { totalGas += g; count++; }
-      if (h !== undefined) { totalHR  += h; }
+  const ids = Object.keys(miners);
+  if (!ids.length) return;
+  const times=[], gVals=[], hVals=[];
+  const now = Date.now();
+  for (let i=0; i<MAX_PTS; i++) {
+    let tg=0, th=0, cnt=0;
+    ids.forEach(id => {
+      const g=(gasHist[id]||[])[i], h=(hrHist[id]||[])[i];
+      if(g!==undefined){tg+=g;cnt++;}
+      if(h!==undefined) th+=h;
     });
-    if (count > 0) {
-      const t = new Date(now - (MAX_HISTORY - i) * REFRESH_MS);
-      times.push(t.toLocaleTimeString("en-US", {hour12:false, second:"2-digit", minute:"2-digit"}));
-      gasVals.push(Math.round(totalGas / count));
-      hrVals.push(Math.round(totalHR  / count));
+    if(cnt>0){
+      const t=new Date(now-(MAX_PTS-i)*REFRESH);
+      times.push(t.toLocaleTimeString("en-US",{hour12:false,second:"2-digit",minute:"2-digit"}));
+      gVals.push(Math.round(tg/cnt));
+      hVals.push(Math.round(th/cnt));
     }
   }
-
-  gasChart.data.labels              = times;
-  gasChart.data.datasets[0].data    = gasVals;
-  gasChart.update("none");
-
-  hrChart.data.labels             = times;
-  hrChart.data.datasets[0].data   = hrVals;
-  hrChart.update("none");
+  gasChart.data.labels=times; gasChart.data.datasets[0].data=gVals; gasChart.update("none");
+  hrChart.data.labels=times;  hrChart.data.datasets[0].data=hVals;  hrChart.update("none");
 }
 
-// ================================================================
-//  CARD RENDERING
-// ================================================================
-function getGasClass(gas) {
-  if (gas >= 600) return "danger";
-  if (gas >= 300) return "warn";
-  return "safe";
+// ── DISMISS ──
+async function dismissAlerts(minerId) {
+  try {
+    await fetch(`${API}/acknowledge/${minerId}`, {method:"POST"});
+    if (miners[minerId]) {
+      miners[minerId].alerts     = [];
+      miners[minerId].alertAcked = true;
+    }
+    addLog(`✓ Alerts acknowledged for ${minerId}`, "ack");
+    renderAll();
+    // Check if any danger still active after dismiss
+    checkAlarmState();
+  } catch(e) {
+    addLog(`Dismiss failed: ${e.message}`, "warn");
+  }
 }
 
-function getHRClass(hr) {
-  if (!hr || hr === 0) return "warn";          // No contact
-  if (hr > 140 || hr < 40) return "danger";
-  if (hr > 120 || hr < 50) return "warn";
-  return "safe";
+function checkAlarmState() {
+  const hasDanger = Object.values(miners).some(m =>
+    m.isOnline && !m.alertAcked &&
+    m.alerts && m.alerts.length > 0 &&
+    m.alerts.some(a => a.startsWith("DANGER"))
+  );
+  if (!hasDanger) stopAlarm();
 }
 
-function getTempClass(t) {
-  if (t > 40) return "danger";
-  if (t > 35) return "warn";
-  return "safe";
-}
+// ── RENDER CARD ──
+function renderCard(m) {
+  const id       = m.minerID;
+  const online   = m.isOnline !== false;
+  const status   = online ? (m.workingStatus || "UNKNOWN") : "OFFLINE";
+  const dl       = m.dangerLevel || "SAFE";
+  const hs       = m.healthScore || 0;
+  const alerts   = (m.alerts || []).filter(Boolean);
+  const acked    = m.alertAcked || false;
+  const fingerOn = m.fingerOn !== false && m.hrStatus !== "NO_CONTACT";
+  const sAgo     = m.secondsAgo || 0;
 
-function getHealthColor(score) {
-  if (score >= 70) return "#00e676";
-  if (score >= 40) return "#ffca28";
-  return "#ff1744";
-}
+  const cardCls  = !online ? "offline" : dl==="DANGER"?"danger":dl==="WARNING"?"warn":"";
+  const hc       = healthColor(hs);
 
-function formatTime(ts) {
-  try { return new Date(ts).toLocaleTimeString("en-US", {hour12: false}); }
-  catch { return "--:--:--"; }
-}
+  // HR display
+  let hrDisplay, hrCls;
+  if (!online) {
+    hrDisplay = "---"; hrCls = "grey";
+  } else if (!fingerOn) {
+    hrDisplay = "NO CONTACT"; hrCls = "grey";
+  } else {
+    hrDisplay = m.heartRate; hrCls = hrClass(m.heartRate, true);
+  }
 
-function isDisconnected(id) {
-  const last = minerLastSeen[id];
-  return last && (Date.now() - last) > DISCONNECT_MS;
-}
+  // Alert tags
+  let alertHTML = "";
+  if (!acked && alerts.length) {
+    alertHTML = alerts.map(a => {
+      const isDanger = a.startsWith("DANGER");
+      return `<span class="atag ${isDanger?'':'warn-tag'}">${isDanger?"🔴":"🟡"} ${a}</span>`;
+    }).join("");
+  }
 
-function renderMinerCard(data) {
-  const id        = data.minerID;
-  const status    = data.workingStatus || "UNKNOWN";
-  const dl        = data.dangerLevel   || "SAFE";
-  const hs        = data.healthScore   || 0;
-  const alerts    = data.alerts        || [];
-  const hr        = data.heartRate;
-  const disc      = isDisconnected(id);
-
-  const cardClass = disc
-    ? "disconnected"
-    : dl === "DANGER" ? "danger" : dl === "WARNING" ? "warn" : "";
-
-  const alertHTML = alerts.length
-    ? alerts.map(a => `<span class="alert-tag">${a.replace(/[🔴🟡]/g, "").trim()}</span>`).join("")
-    : "";
-
-  const healthColor = getHealthColor(hs);
-
-  // Heart rate display: show "-- NO CONTACT" when hr is 0 or null
-  const hrDisplay = (!hr || hr === 0)
-    ? `<span class="metric-value warn" style="font-size:12px">NO CONTACT</span>`
-    : `<div class="metric-value ${getHRClass(hr)}">${hr}<span class="metric-unit">bpm</span></div>`;
-
-  const disconnectedOverlay = disc ? `
-    <div class="disconnected-overlay">
-      <span class="disc-icon">📡</span>
-      WAITING FOR CONNECTION…
-    </div>` : "";
+  // Dismiss / acked display
+  let actionHTML = "";
+  if (!online) {
+    actionHTML = `<div class="offline-msg">📡 SIGNAL LOST — ${sAgo}s ago</div>`;
+  } else if (alerts.length && !acked) {
+    actionHTML = `<button class="dismiss-btn" onclick="dismissAlerts('${id}')">✓ ACKNOWLEDGE &amp; DISMISS ALERTS</button>`;
+  } else if (acked) {
+    actionHTML = `<div class="acked-badge">✓ ALERTS ACKNOWLEDGED</div>`;
+  }
 
   return `
-    <div class="miner-card ${cardClass}" id="card-${id}" onclick="focusMiner('${id}')">
-      ${disconnectedOverlay}
-      <div class="card-header">
-        <div class="miner-id">${id.toUpperCase()}</div>
-        ${disc
-          ? `<span class="disconnected-badge">OFFLINE</span>`
-          : `<div class="status-badge ${status}">${status}</div>`}
-      </div>
-
-      <div class="card-metrics">
-        <div class="metric">
-          <div class="metric-label">🌡 TEMP</div>
-          <div class="metric-value ${getTempClass(data.temperature)}">
-            ${data.temperature}<span class="metric-unit">°C</span>
-          </div>
-        </div>
-        <div class="metric">
-          <div class="metric-label">💨 GAS</div>
-          <div class="metric-value ${getGasClass(data.gas)}">
-            ${data.gas}<span class="metric-unit">ppm</span>
-          </div>
-        </div>
-        <div class="metric">
-          <div class="metric-label">❤️ HEART RATE</div>
-          ${hrDisplay}
-        </div>
-        <div class="metric">
-          <div class="metric-label">💧 HUMIDITY</div>
-          <div class="metric-value">
-            ${data.humidity}<span class="metric-unit">%</span>
-          </div>
-        </div>
-      </div>
-
-      <div class="health-bar-wrap">
-        <div class="health-bar-header">
-          <span>HEALTH SCORE</span>
-          <span class="health-score-val" style="color:${healthColor}">${hs}/100</span>
-        </div>
-        <div class="health-bar-track">
-          <div class="health-bar-fill" style="
-            width:${hs}%;
-            background: linear-gradient(90deg, ${healthColor}88, ${healthColor});
-          "></div>
-        </div>
-      </div>
-
-      ${alertHTML ? `<div class="alerts-row">${alertHTML}</div>` : ""}
-      ${data.fallDetected ? `<div class="alerts-row"><span class="alert-tag">⚠ FALL DETECTED</span></div>` : ""}
-
-      <div class="timestamp">LAST UPDATE: ${formatTime(data.timestamp)}</div>
+  <div class="card ${cardCls}" id="card-${id}">
+    <div class="card-top">
+      <div class="miner-id">${id.toUpperCase()}</div>
+      <div class="badge ${status}">${status}</div>
     </div>
-  `;
+    <div class="metrics">
+      <div class="metric">
+        <div class="mlbl">🌡 TEMP</div>
+        <div class="mval ${online?tmpClass(m.temperature):'grey'}">${online?m.temperature:'--'}<span class="munit">°C</span></div>
+      </div>
+      <div class="metric">
+        <div class="mlbl">💨 GAS</div>
+        <div class="mval ${online?gasClass(m.gas):'grey'}">${online?m.gas:'--'}<span class="munit">ppm</span></div>
+      </div>
+      <div class="metric">
+        <div class="mlbl">❤ HEART RATE</div>
+        <div class="mval ${hrCls}" style="${!fingerOn&&online?'font-size:10px;margin-top:5px':''}">
+          ${hrDisplay}${fingerOn&&online?`<span class="munit">bpm</span>`:''}
+        </div>
+      </div>
+      <div class="metric">
+        <div class="mlbl">💧 HUMIDITY</div>
+        <div class="mval">${online?m.humidity:'--'}<span class="munit">%</span></div>
+      </div>
+    </div>
+    <div class="hbar-wrap">
+      <div class="hbar-hdr"><span>HEALTH SCORE</span><span style="color:${hc};font-size:10px;font-weight:bold">${hs}/100</span></div>
+      <div class="hbar-track"><div class="hbar-fill" style="width:${hs}%;background:linear-gradient(90deg,${hc}88,${hc})"></div></div>
+    </div>
+    ${alertHTML ? `<div class="alert-row">${alertHTML}</div>` : ""}
+    ${m.fallDetected && online ? `<div class="alert-row"><span class="atag">🔴 FALL DETECTED</span></div>` : ""}
+    ${actionHTML}
+    <div class="ts">LAST: ${fmt(m.timestamp)} ${online?'':`· OFFLINE`}</div>
+  </div>`;
 }
 
-// ================================================================
-//  STATS BAR
-// ================================================================
+function renderAll() {
+  const grid = document.getElementById("grid");
+  const list = Object.values(miners);
+  if (!list.length) {
+    grid.innerHTML = `<div class="nodata"><div class="nodata-icon">📡</div><h3>AWAITING SIGNAL</h3><p>No data yet. Click ⚡ SIMULATE to test.</p></div>`;
+    return;
+  }
+  grid.innerHTML = list.map(renderCard).join("");
+}
+
 function updateStats() {
-  const all    = Object.values(miners);
-  const total  = all.length;
-  const safe   = all.filter(m => m.dangerLevel === "SAFE"    && !isDisconnected(m.minerID)).length;
-  const warn   = all.filter(m => m.dangerLevel === "WARNING" && !isDisconnected(m.minerID)).length;
-  const danger = all.filter(m => (m.dangerLevel === "DANGER" || m.workingStatus === "CRITICAL") && !isDisconnected(m.minerID)).length;
+  const list    = Object.values(miners);
+  const online  = list.filter(m => m.isOnline !== false);
+  const offline = list.filter(m => m.isOnline === false);
+  const safe    = online.filter(m => m.dangerLevel==="SAFE").length;
+  const warn    = online.filter(m => m.dangerLevel==="WARNING").length;
+  const danger  = online.filter(m => m.dangerLevel==="DANGER"||m.workingStatus==="CRITICAL").length;
 
-  document.getElementById("statMiners").textContent = total;
-  document.getElementById("statSafe").textContent   = safe;
-  document.getElementById("statWarn").textContent   = warn;
-  document.getElementById("statDanger").textContent = danger;
-
-  const now = new Date();
-  document.getElementById("statUpdate").textContent =
-    now.toLocaleTimeString("en-US", {hour12:false});
-
-  // Connection dot: green if any live miner, grey if all disconnected / none
-  const anyLive = all.some(m => !isDisconnected(m.minerID));
-  document.getElementById("connDot").style.background =
-    anyLive ? "var(--safe)" : "var(--text-dim)";
+  document.getElementById("sTotal").textContent   = online.length;
+  document.getElementById("sSafe").textContent    = safe;
+  document.getElementById("sWarn").textContent    = warn;
+  document.getElementById("sDanger").textContent  = danger;
+  document.getElementById("sOffline").textContent = offline.length;
+  document.getElementById("sTime").textContent    = new Date().toLocaleTimeString("en-US",{hour12:false});
+  document.getElementById("connDot").style.background = online.length>0?"var(--safe)":"var(--dim)";
 }
 
-// ================================================================
-//  ALERT LOG
-// ================================================================
-function addLog(text, level = "info") {
-  const log   = document.getElementById("alertLog");
-  const entry = document.createElement("div");
-  entry.className = `log-entry ${level}`;
-  entry.innerHTML = `${text}<span class="log-time">${new Date().toLocaleTimeString()}</span>`;
-  log.prepend(entry);
-  while (log.children.length > 50) log.removeChild(log.lastChild);
-}
-
-// ================================================================
-//  FOCUS MINER (click card → highlight charts)
-// ================================================================
-function focusMiner(id) {
-  if (!gasHistory[id]) return;
-  const gVals = gasHistory[id];
-  const hVals = hrHistory[id] || [];
-  const times = gVals.map((_, i) => `T-${gVals.length - i}s`);
-
-  gasChart.data.labels              = times;
-  gasChart.data.datasets[0].data    = gVals;
-  gasChart.update();
-
-  hrChart.data.labels             = times;
-  hrChart.data.datasets[0].data   = hVals;
-  hrChart.update();
-}
-
-// ================================================================
-//  MAIN FETCH LOOP
-// ================================================================
+// ── FETCH LOOP ──
 async function fetchAndUpdate() {
   try {
-    const resp = await fetch(`${API_BASE}/latest`);
+    const resp = await fetch(`${API}/latest`);
     if (!resp.ok) return;
     const data = await resp.json();
+    const list = data.miners || [];
 
-    const minerList  = data.miners || [];
-    const newAlertMessages = [];
+    let newDanger = false;
 
-    minerList.forEach(m => {
+    list.forEach(m => {
       const id   = m.minerID;
       const prev = miners[id];
-
-      miners[id]         = m;
-      minerLastSeen[id]  = Date.now();   // Record last-seen time
+      miners[id] = m;
 
       // History
-      if (!gasHistory[id]) gasHistory[id] = [];
-      if (!hrHistory[id])  hrHistory[id]  = [];
-      gasHistory[id].push(m.gas);
-      hrHistory[id].push(m.heartRate || 0);
-      if (gasHistory[id].length > MAX_HISTORY) gasHistory[id].shift();
-      if (hrHistory[id].length  > MAX_HISTORY) hrHistory[id].shift();
+      gasHist[id] = gasHist[id] || [];
+      hrHist[id]  = hrHist[id]  || [];
+      if (m.isOnline !== false) {
+        gasHist[id].push(m.gas || 0);
+        hrHist[id].push(m.heartRate || 0);
+        if (gasHist[id].length > MAX_PTS) gasHist[id].shift();
+        if (hrHist[id].length  > MAX_PTS) hrHist[id].shift();
+      }
 
-      // Log new alerts and collect for banner
-      if (m.alerts && m.alerts.length) {
-        const prevAlerts = prev ? (prev.alerts || []).join() : "";
-        const newAlerts  = m.alerts.join();
-        if (newAlerts !== prevAlerts) {
+      // Log new alerts
+      if (m.isOnline !== false && m.alerts && m.alerts.length) {
+        const prevKey = prev ? (prev.alerts||[]).join("|") : "";
+        const newKey  = m.alerts.join("|");
+        if (newKey !== prevKey) {
           m.alerts.forEach(a => {
-            const level = a.includes("DANGER") ? "danger" : "warn";
-            const clean = a.replace(/[🔴🟡]/g, "").trim();
-            addLog(`[${id}] ${clean}`, level);
-            if (level === "danger") newAlertMessages.push(`[${id}] ${clean}`);
+            const isDanger = a.startsWith("DANGER");
+            addLog(`[${id}] ${a}`, isDanger?"danger":"warn");
+            if (isDanger && !m.alertAcked) newDanger = true;
           });
         }
       }
-    });
 
-    // Check for newly disconnected miners
-    Object.keys(miners).forEach(id => {
-      if (isDisconnected(id)) {
-        const prev = miners[id];
-        if (prev && !prev._loggedDisconnect) {
-          addLog(`[${id}] Device disconnected — waiting for reconnection`, "warn");
-          miners[id]._loggedDisconnect = true;
-        }
-      } else {
-        if (miners[id]._loggedDisconnect) {
-          addLog(`[${id}] Device reconnected`, "info");
-          miners[id]._loggedDisconnect = false;
-        }
+      // Log newly offline
+      if (prev && prev.isOnline !== false && m.isOnline === false) {
+        addLog(`[${id}] SIGNAL LOST — device offline`, "danger");
+      }
+
+      // Log came back online
+      if (prev && prev.isOnline === false && m.isOnline !== false) {
+        addLog(`[${id}] Signal restored — device back online`, "ack");
       }
     });
 
-    // Render cards
-    const grid = document.getElementById("minersGrid");
-    if (Object.keys(miners).length === 0) {
-      grid.innerHTML = `
-        <div class="no-data">
-          <div class="no-data-icon">📡</div>
-          <h3>AWAITING SIGNAL</h3>
-          <p>No helmet data received yet.<br/>Click <strong>SIMULATE DATA</strong> to test the dashboard.</p>
-        </div>`;
-    } else {
-      grid.innerHTML = Object.values(miners)
-        .map(m => renderMinerCard(m))
-        .join("");
-    }
-
+    renderAll();
     updateStats();
     updateCharts();
 
-    // Show alert banner if new critical alerts
-    if (newAlertMessages.length > 0) {
-      showAlertBanner(newAlertMessages);
-    }
+    if (newDanger && !muted) startAlarm();
+    else checkAlarmState();
 
-  } catch (err) {
-    console.warn("Fetch error:", err.message);
-    addLog(`Connection error: ${err.message}`, "warn");
+  } catch(e) {
+    addLog(`Connection error: ${e.message}`, "warn");
   }
 }
 
-// ================================================================
-//  SIMULATE DATA
-// ================================================================
-async function triggerSimulate() {
+async function triggerSim() {
   try {
-    const resp = await fetch(`${API_BASE}/simulate`, { method: "POST" });
-    const data = await resp.json();
-    addLog(`Simulated data injected for: ${data.simulated.join(", ")}`, "info");
+    const r = await fetch(`${API}/simulate`,{method:"POST"});
+    const d = await r.json();
+    addLog(`Simulated: ${d.simulated.join(", ")}`, "info");
     await fetchAndUpdate();
   } catch(e) {
-    addLog("Simulate failed — is the server running?", "danger");
+    addLog("Simulate failed — server running?","danger");
   }
 }
 
-// ================================================================
-//  INIT
-// ================================================================
-initCharts();
 fetchAndUpdate();
-setInterval(fetchAndUpdate, REFRESH_MS);
+setInterval(fetchAndUpdate, REFRESH);
 </script>
-
 </body>
 </html>
