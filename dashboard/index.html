@@ -532,6 +532,100 @@
     ::-webkit-scrollbar-thumb { background: var(--border-glow); }
 
     /* ───────────────────────────────────────────────
+       ALERT BANNER (dismissible, top of screen)
+    ─────────────────────────────────────────────── */
+    #alertBanner {
+      display: none;
+      position: fixed;
+      top: 0; left: 0; right: 0;
+      z-index: 1000;
+      background: linear-gradient(90deg, #3a0010, #7a001a, #3a0010);
+      border-bottom: 2px solid var(--danger);
+      padding: 10px 20px;
+      display: none;
+      align-items: center;
+      gap: 14px;
+      animation: banner-flash 0.8s step-start infinite;
+    }
+
+    @keyframes banner-flash {
+      0%, 100% { border-bottom-color: var(--danger); }
+      50%       { border-bottom-color: transparent; }
+    }
+
+    #alertBanner .banner-icon { font-size: 22px; }
+
+    #alertBanner .banner-text {
+      flex: 1;
+      font-family: var(--font-mono);
+      font-size: 11px;
+      color: #ff8a80;
+      letter-spacing: 1px;
+    }
+
+    #alertBanner .banner-sound-toggle {
+      font-family: var(--font-mono);
+      font-size: 10px;
+      padding: 4px 10px;
+      background: transparent;
+      border: 1px solid rgba(255,23,68,0.5);
+      color: #ff8a80;
+      cursor: pointer;
+      letter-spacing: 1px;
+    }
+    #alertBanner .banner-sound-toggle:hover { background: rgba(255,23,68,0.15); }
+
+    #alertBanner .banner-dismiss {
+      font-family: var(--font-mono);
+      font-size: 10px;
+      padding: 4px 14px;
+      background: var(--danger);
+      border: none;
+      color: white;
+      cursor: pointer;
+      letter-spacing: 2px;
+      font-weight: bold;
+    }
+    #alertBanner .banner-dismiss:hover { background: #d50032; }
+
+    /* ───────────────────────────────────────────────
+       DISCONNECTED OVERLAY on miner card
+    ─────────────────────────────────────────────── */
+    .miner-card.disconnected {
+      opacity: 0.55;
+      border-color: var(--text-dim) !important;
+      animation: none !important;
+    }
+    .miner-card.disconnected::before { background: var(--text-dim) !important; }
+
+    .disconnected-badge {
+      display: inline-block;
+      font-family: var(--font-mono);
+      font-size: 9px;
+      color: var(--text-dim);
+      border: 1px solid var(--text-dim);
+      padding: 2px 8px;
+      letter-spacing: 2px;
+      margin-bottom: 8px;
+    }
+
+    .disconnected-overlay {
+      position: absolute;
+      inset: 0;
+      background: rgba(4, 10, 15, 0.7);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-family: var(--font-mono);
+      font-size: 11px;
+      letter-spacing: 3px;
+      color: var(--text-dim);
+      flex-direction: column;
+      gap: 6px;
+    }
+    .disconnected-overlay .disc-icon { font-size: 28px; opacity: 0.5; }
+
+    /* ───────────────────────────────────────────────
        RESPONSIVE
     ─────────────────────────────────────────────── */
     @media (max-width: 900px) {
@@ -549,6 +643,14 @@
 </head>
 
 <body>
+
+<!-- ═══ ALERT BANNER (dismissible) ══════════════════════════ -->
+<div id="alertBanner">
+  <span class="banner-icon">🚨</span>
+  <div class="banner-text" id="bannerText">CRITICAL ALERT — SEE MINER CARDS BELOW</div>
+  <button class="banner-sound-toggle" id="soundToggleBtn" onclick="toggleSound()">🔇 MUTE</button>
+  <button class="banner-dismiss" onclick="dismissAlert()">✓ DISMISS</button>
+</div>
 
 <!-- ═══ HEADER ═══════════════════════════════════════════════ -->
 <header>
@@ -665,13 +767,20 @@ const API_BASE    = window.location.origin;  // Same origin as server
 const REFRESH_MS  = 3000;  // Poll every 3 seconds
 const MAX_HISTORY = 20;    // Chart data points
 
+// A miner is considered DISCONNECTED if no update received within this window.
+// Set to 3× the send interval (15 s) to tolerate one missed packet.
+const DISCONNECT_MS = 15000;
+
 // ================================================================
 //  STATE
 // ================================================================
 let miners        = {};       // {minerID: latestRecord}
+let minerLastSeen = {};       // {minerID: Date.now() timestamp}
 let gasHistory    = {};       // {minerID: [values]}
 let hrHistory     = {};       // {minerID: [values]}
-let alertSounding = false;
+let alertActive   = false;    // Is there an unacknowledged alert?
+let soundMuted    = false;    // User has muted alert sound
+let alertInterval = null;     // Repeating beep interval handle
 let gasChart, hrChart;
 let audioCtx;
 
@@ -692,10 +801,8 @@ document.getElementById("initTime").textContent =
 // ================================================================
 //  WEB AUDIO ALERT
 // ================================================================
-function playAlertSound() {
-  if (alertSounding) return;
-  alertSounding = true;
-
+function beepOnce() {
+  if (soundMuted) return;
   try {
     if (!audioCtx) audioCtx = new (window.AudioContext || window.webkitAudioContext)();
 
@@ -712,13 +819,54 @@ function playAlertSound() {
       osc.stop(audioCtx.currentTime + start + dur);
     }
 
-    beep(880, 0,   0.1);
+    beep(880, 0,    0.1);
     beep(660, 0.15, 0.1);
     beep(880, 0.3,  0.1);
     beep(440, 0.45, 0.15);
   } catch(e) { /* autoplay blocked */ }
+}
 
-  setTimeout(() => alertSounding = false, 4000);
+function startAlertSound() {
+  if (alertInterval) return;           // Already running
+  beepOnce();
+  alertInterval = setInterval(beepOnce, 4000);  // Repeat every 4 s
+}
+
+function stopAlertSound() {
+  if (alertInterval) { clearInterval(alertInterval); alertInterval = null; }
+}
+
+// ================================================================
+//  ALERT BANNER — show / dismiss / mute
+// ================================================================
+function showAlertBanner(messages) {
+  const banner = document.getElementById("alertBanner");
+  document.getElementById("bannerText").textContent =
+    messages.length === 1
+      ? messages[0]
+      : `${messages.length} ACTIVE ALERTS — CHECK MINER CARDS`;
+  banner.style.display = "flex";
+  alertActive = true;
+  startAlertSound();
+  updateSoundBtn();
+}
+
+function dismissAlert() {
+  document.getElementById("alertBanner").style.display = "none";
+  alertActive = false;
+  stopAlertSound();
+}
+
+function toggleSound() {
+  soundMuted = !soundMuted;
+  if (soundMuted) stopAlertSound();
+  else if (alertActive) startAlertSound();
+  updateSoundBtn();
+}
+
+function updateSoundBtn() {
+  const btn = document.getElementById("soundToggleBtn");
+  btn.textContent = soundMuted ? "🔊 UNMUTE" : "🔇 MUTE";
 }
 
 // ================================================================
@@ -798,8 +946,7 @@ function updateCharts() {
   const minerIds = Object.keys(miners);
   if (!minerIds.length) return;
 
-  // Aggregate: average across all miners
-  const times  = [];
+  const times   = [];
   const gasVals = [];
   const hrVals  = [];
   const now     = new Date();
@@ -808,7 +955,7 @@ function updateCharts() {
     let totalGas = 0, totalHR = 0, count = 0;
     minerIds.forEach(id => {
       const g = (gasHistory[id] || [])[i];
-      const h = (hrHistory[id] || [])[i];
+      const h = (hrHistory[id]  || [])[i];
       if (g !== undefined) { totalGas += g; count++; }
       if (h !== undefined) { totalHR  += h; }
     });
@@ -816,16 +963,16 @@ function updateCharts() {
       const t = new Date(now - (MAX_HISTORY - i) * REFRESH_MS);
       times.push(t.toLocaleTimeString("en-US", {hour12:false, second:"2-digit", minute:"2-digit"}));
       gasVals.push(Math.round(totalGas / count));
-      hrVals.push(Math.round(totalHR / count));
+      hrVals.push(Math.round(totalHR  / count));
     }
   }
 
-  gasChart.data.labels   = times;
-  gasChart.data.datasets[0].data = gasVals;
+  gasChart.data.labels              = times;
+  gasChart.data.datasets[0].data    = gasVals;
   gasChart.update("none");
 
-  hrChart.data.labels   = times;
-  hrChart.data.datasets[0].data = hrVals;
+  hrChart.data.labels             = times;
+  hrChart.data.datasets[0].data   = hrVals;
   hrChart.update("none");
 }
 
@@ -839,6 +986,7 @@ function getGasClass(gas) {
 }
 
 function getHRClass(hr) {
+  if (!hr || hr === 0) return "warn";          // No contact
   if (hr > 140 || hr < 40) return "danger";
   if (hr > 120 || hr < 50) return "warn";
   return "safe";
@@ -857,9 +1005,13 @@ function getHealthColor(score) {
 }
 
 function formatTime(ts) {
-  try {
-    return new Date(ts).toLocaleTimeString("en-US", {hour12: false});
-  } catch { return "--:--:--"; }
+  try { return new Date(ts).toLocaleTimeString("en-US", {hour12: false}); }
+  catch { return "--:--:--"; }
+}
+
+function isDisconnected(id) {
+  const last = minerLastSeen[id];
+  return last && (Date.now() - last) > DISCONNECT_MS;
 }
 
 function renderMinerCard(data) {
@@ -868,7 +1020,12 @@ function renderMinerCard(data) {
   const dl        = data.dangerLevel   || "SAFE";
   const hs        = data.healthScore   || 0;
   const alerts    = data.alerts        || [];
-  const cardClass = dl === "DANGER" ? "danger" : dl === "WARNING" ? "warn" : "";
+  const hr        = data.heartRate;
+  const disc      = isDisconnected(id);
+
+  const cardClass = disc
+    ? "disconnected"
+    : dl === "DANGER" ? "danger" : dl === "WARNING" ? "warn" : "";
 
   const alertHTML = alerts.length
     ? alerts.map(a => `<span class="alert-tag">${a.replace(/[🔴🟡]/g, "").trim()}</span>`).join("")
@@ -876,11 +1033,25 @@ function renderMinerCard(data) {
 
   const healthColor = getHealthColor(hs);
 
+  // Heart rate display: show "-- NO CONTACT" when hr is 0 or null
+  const hrDisplay = (!hr || hr === 0)
+    ? `<span class="metric-value warn" style="font-size:12px">NO CONTACT</span>`
+    : `<div class="metric-value ${getHRClass(hr)}">${hr}<span class="metric-unit">bpm</span></div>`;
+
+  const disconnectedOverlay = disc ? `
+    <div class="disconnected-overlay">
+      <span class="disc-icon">📡</span>
+      WAITING FOR CONNECTION…
+    </div>` : "";
+
   return `
     <div class="miner-card ${cardClass}" id="card-${id}" onclick="focusMiner('${id}')">
+      ${disconnectedOverlay}
       <div class="card-header">
         <div class="miner-id">${id.toUpperCase()}</div>
-        <div class="status-badge ${status}">${status}</div>
+        ${disc
+          ? `<span class="disconnected-badge">OFFLINE</span>`
+          : `<div class="status-badge ${status}">${status}</div>`}
       </div>
 
       <div class="card-metrics">
@@ -898,9 +1069,7 @@ function renderMinerCard(data) {
         </div>
         <div class="metric">
           <div class="metric-label">❤️ HEART RATE</div>
-          <div class="metric-value ${getHRClass(data.heartRate)}">
-            ${data.heartRate}<span class="metric-unit">bpm</span>
-          </div>
+          ${hrDisplay}
         </div>
         <div class="metric">
           <div class="metric-label">💧 HUMIDITY</div>
@@ -937,9 +1106,9 @@ function renderMinerCard(data) {
 function updateStats() {
   const all    = Object.values(miners);
   const total  = all.length;
-  const safe   = all.filter(m => m.dangerLevel === "SAFE").length;
-  const warn   = all.filter(m => m.dangerLevel === "WARNING").length;
-  const danger = all.filter(m => m.dangerLevel === "DANGER" || m.workingStatus === "CRITICAL").length;
+  const safe   = all.filter(m => m.dangerLevel === "SAFE"    && !isDisconnected(m.minerID)).length;
+  const warn   = all.filter(m => m.dangerLevel === "WARNING" && !isDisconnected(m.minerID)).length;
+  const danger = all.filter(m => (m.dangerLevel === "DANGER" || m.workingStatus === "CRITICAL") && !isDisconnected(m.minerID)).length;
 
   document.getElementById("statMiners").textContent = total;
   document.getElementById("statSafe").textContent   = safe;
@@ -950,22 +1119,21 @@ function updateStats() {
   document.getElementById("statUpdate").textContent =
     now.toLocaleTimeString("en-US", {hour12:false});
 
-  // Connection dot
+  // Connection dot: green if any live miner, grey if all disconnected / none
+  const anyLive = all.some(m => !isDisconnected(m.minerID));
   document.getElementById("connDot").style.background =
-    total > 0 ? "var(--safe)" : "var(--text-dim)";
+    anyLive ? "var(--safe)" : "var(--text-dim)";
 }
 
 // ================================================================
 //  ALERT LOG
 // ================================================================
 function addLog(text, level = "info") {
-  const log  = document.getElementById("alertLog");
+  const log   = document.getElementById("alertLog");
   const entry = document.createElement("div");
   entry.className = `log-entry ${level}`;
   entry.innerHTML = `${text}<span class="log-time">${new Date().toLocaleTimeString()}</span>`;
   log.prepend(entry);
-
-  // Keep last 50 entries
   while (log.children.length > 50) log.removeChild(log.lastChild);
 }
 
@@ -978,12 +1146,12 @@ function focusMiner(id) {
   const hVals = hrHistory[id] || [];
   const times = gVals.map((_, i) => `T-${gVals.length - i}s`);
 
-  gasChart.data.labels   = times;
-  gasChart.data.datasets[0].data = gVals;
+  gasChart.data.labels              = times;
+  gasChart.data.datasets[0].data    = gVals;
   gasChart.update();
 
-  hrChart.data.labels  = times;
-  hrChart.data.datasets[0].data = hVals;
+  hrChart.data.labels             = times;
+  hrChart.data.datasets[0].data   = hVals;
   hrChart.update();
 }
 
@@ -996,40 +1164,58 @@ async function fetchAndUpdate() {
     if (!resp.ok) return;
     const data = await resp.json();
 
-    const minerList = data.miners || [];
-    let hasNewAlert = false;
+    const minerList  = data.miners || [];
+    const newAlertMessages = [];
 
     minerList.forEach(m => {
       const id   = m.minerID;
       const prev = miners[id];
 
-      miners[id] = m;
+      miners[id]         = m;
+      minerLastSeen[id]  = Date.now();   // Record last-seen time
 
       // History
       if (!gasHistory[id]) gasHistory[id] = [];
       if (!hrHistory[id])  hrHistory[id]  = [];
       gasHistory[id].push(m.gas);
-      hrHistory[id].push(m.heartRate);
+      hrHistory[id].push(m.heartRate || 0);
       if (gasHistory[id].length > MAX_HISTORY) gasHistory[id].shift();
       if (hrHistory[id].length  > MAX_HISTORY) hrHistory[id].shift();
 
-      // Log new alerts
+      // Log new alerts and collect for banner
       if (m.alerts && m.alerts.length) {
         const prevAlerts = prev ? (prev.alerts || []).join() : "";
         const newAlerts  = m.alerts.join();
         if (newAlerts !== prevAlerts) {
           m.alerts.forEach(a => {
             const level = a.includes("DANGER") ? "danger" : "warn";
-            addLog(`[${id}] ${a.replace(/[🔴🟡]/g, "").trim()}`, level);
-            if (level === "danger") hasNewAlert = true;
+            const clean = a.replace(/[🔴🟡]/g, "").trim();
+            addLog(`[${id}] ${clean}`, level);
+            if (level === "danger") newAlertMessages.push(`[${id}] ${clean}`);
           });
+        }
+      }
+    });
+
+    // Check for newly disconnected miners
+    Object.keys(miners).forEach(id => {
+      if (isDisconnected(id)) {
+        const prev = miners[id];
+        if (prev && !prev._loggedDisconnect) {
+          addLog(`[${id}] Device disconnected — waiting for reconnection`, "warn");
+          miners[id]._loggedDisconnect = true;
+        }
+      } else {
+        if (miners[id]._loggedDisconnect) {
+          addLog(`[${id}] Device reconnected`, "info");
+          miners[id]._loggedDisconnect = false;
         }
       }
     });
 
     // Render cards
     const grid = document.getElementById("minersGrid");
-    if (minerList.length === 0) {
+    if (Object.keys(miners).length === 0) {
       grid.innerHTML = `
         <div class="no-data">
           <div class="no-data-icon">📡</div>
@@ -1045,7 +1231,10 @@ async function fetchAndUpdate() {
     updateStats();
     updateCharts();
 
-    if (hasNewAlert) playAlertSound();
+    // Show alert banner if new critical alerts
+    if (newAlertMessages.length > 0) {
+      showAlertBanner(newAlertMessages);
+    }
 
   } catch (err) {
     console.warn("Fetch error:", err.message);
@@ -1074,5 +1263,6 @@ initCharts();
 fetchAndUpdate();
 setInterval(fetchAndUpdate, REFRESH_MS);
 </script>
+
 </body>
 </html>
