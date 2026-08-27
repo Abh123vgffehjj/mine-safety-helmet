@@ -10,7 +10,7 @@ from flask_cors import CORS
 from pymongo import MongoClient, DESCENDING
 from pymongo.errors import ConnectionFailure
 
-MONGO_URI    = os.getenv("MONGO_URI", "mongodb+srv://son17july2006_db_user:m8KVGi6MLaQG7vwc@cluster0.ww44vj4.mongodb.net/mineDB?retryWrites=true&w=majority&appName=Cluster0")
+MONGO_URI    = os.getenv("MONGO_URI", "mongodb+srv://mineAdmin:Mine%40Safety2025@cluster0.sfxmvya.mongodb.net/?appName=Cluster0")
 DB_NAME      = "mineDB"
 COLLECTION   = "helmetData"
 PORT         = int(os.getenv("PORT", 5000))
